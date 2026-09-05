@@ -14,9 +14,9 @@ Find common vulnerabilities, get clear explanations, and suggested fixes — all
 - **Local-first** — Runs completely on your machine with Ollama
 - **Code scanning** — Strong pattern rules + optional AI deep analysis
 - **Web scanning** — Security headers, cookies, info disclosure
+- **Deep web mode** — Playwright checks (forms, mixed content, password over HTTP)
 - **Reports** — Markdown + JSON
 - **CLI focused** — Fast and scriptable
-- **No cloud** — Your code never leaves your machine
 
 ### Code detection
 - Hard-coded secrets / API keys
@@ -28,10 +28,11 @@ Find common vulnerabilities, get clear explanations, and suggested fixes — all
 - AI-assisted findings (structured parsing)
 
 ### Web detection
-- Missing CSP, HSTS, X-Frame-Options
-- Missing X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+- Missing CSP, HSTS, X-Frame-Options, X-Content-Type-Options
+- Referrer-Policy, Permissions-Policy
 - Server / X-Powered-By disclosure
-- Cookies missing Secure / HttpOnly flags
+- Cookies missing Secure / HttpOnly
+- `--deep`: password over HTTP, CSRF heuristic, mixed content
 
 ---
 
@@ -39,10 +40,11 @@ Find common vulnerabilities, get clear explanations, and suggested fixes — all
 
 - Python 3.10+
 - [Ollama](https://ollama.com) (optional but recommended)
-- Recommended models: `llama3.2`, `mistral`, `qwen2.5`
+- For deep web scans: Playwright browsers
 
 ```bash
 ollama pull llama3.2
+playwright install chromium   # only if you use --deep
 ```
 
 ---
@@ -54,7 +56,7 @@ git clone https://github.com/BluHExH/LocalVulnAI.git
 cd LocalVulnAI
 
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 
 pip install -r requirements.txt
 ```
@@ -64,22 +66,18 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-# Check Ollama
 python -m localvulnai check
 
-# Scan local code (pattern + AI)
+# Code scan
 python -m localvulnai scan --path ./your-project
-
-# Fast pattern-only scan
 python -m localvulnai scan --path ./your-project --no-ai
 
-# Scan authorized URL
+# Web scan
 python -m localvulnai scan --url https://example.com
+python -m localvulnai scan --url https://example.com --deep
 
-# Save Markdown report
+# Reports
 python -m localvulnai scan --path ./examples/sample_vulnerable_code -o report.md
-
-# Save JSON report
 python -m localvulnai scan --path ./examples/sample_vulnerable_code -o report.json --format json
 ```
 
@@ -87,26 +85,17 @@ python -m localvulnai scan --path ./examples/sample_vulnerable_code -o report.js
 
 ## Project Status
 
-**v0.2.0**
-- Working CLI
-- Pattern-based code scanner (multiple rules)
-- Structured AI analysis via Ollama
-- Improved web header + cookie checks
+**v0.3.0**
+- Pattern + AI code scanner
+- Web header/cookie scanner
+- Playwright deep mode
 - Markdown + JSON reports
-
-**Later ideas**
-- Playwright deeper web checks
-- Burp-friendly export
-- More language-specific rules
 
 ---
 
 ## Disclaimer
 
-This tool is for **educational purposes** and **authorized security testing** only.  
-The authors are not responsible for any misuse.
-
----
+Educational and **authorized** security testing only.
 
 ## License
 
