@@ -6,13 +6,14 @@ from localvulnai.models.finding import Finding, Severity
 from localvulnai.ai.ollama_client import OllamaClient
 
 
-SUPPORTED_EXTENSIONS = {".py", ".js", ".ts", ".jsx", ".tsx", ".php", ".html", ".java", ".go"}
+SUPPORTED_EXTENSIONS = {".py", ".js", ".ts", ".jsx", ".tsx", ".php", ".html", ".java", ".go", ".rb", ".cs"}
 
-# Simple but useful pattern rules (fast, no AI needed)
 PATTERN_RULES = [
     {
         "name": "Hard-coded secret / API key",
-        "regex": re.compile(r"""(?i)(api[_-]?key|secret[_-]?key|access[_-]?token|aws_secret|password\s*=\s*['\"][^'\"]{4,})"""),
+        "regex": re.compile(
+            r"""(?i)(api[_-]?key|secret[_-]?key|access[_-]?token|aws_secret|password\s*=\s*['\"][^'\"]{4,}|sk-[a-zA-Z0-9]{20,})"""
+        ),
         "severity": Severity.HIGH,
         "description": "Possible hard-coded credential or secret found in source.",
         "recommendation": "Move secrets to environment variables or a secret manager. Never commit credentials.",
@@ -20,7 +21,9 @@ PATTERN_RULES = [
     },
     {
         "name": "Potential SQL injection (string formatting)",
-        "regex": re.compile(r"""(?i)(execute|query|cursor\.execute)\s*\(.*(%s|%d|\.format\(|f['\"].*\{).*"""),
+        "regex": re.compile(
+            r"""(?i)(execute|query|cursor\.execute|raw\()\s*\(.*(%s|%d|\.format\(|f['\"].*\{|'\s*\+)"""
+        ),
         "severity": Severity.HIGH,
         "description": "SQL query appears to be built with string formatting / interpolation.",
         "recommendation": "Use parameterized queries / prepared statements.",
@@ -28,7 +31,9 @@ PATTERN_RULES = [
     },
     {
         "name": "Potential command injection",
-        "regex": re.compile(r"""(?i)(os\.system|subprocess\.(call|run|Popen)|exec\(|eval\()\s*\(.*(\+|format|f['\"])"""),
+        "regex": re.compile(
+            r"""(?i)(os\.system|subprocess\.(call|run|Popen)|exec\(|popen\()\s*\(.*(\+|format|f['\"])"""
+        ),
         "severity": Severity.CRITICAL,
         "description": "Possible command injection via dynamic command construction.",
         "recommendation": "Avoid shell=True. Use argument lists and never pass unsanitized user input.",
@@ -41,6 +46,24 @@ PATTERN_RULES = [
         "description": "Use of eval() or exec() can lead to code injection.",
         "recommendation": "Avoid eval/exec. Use safer alternatives (ast.literal_eval, json, etc.).",
         "cwe": "CWE-95",
+    },
+    {
+        "name": "Potential XSS (unsanitized output)",
+        "regex": re.compile(
+            r"""(?i)(innerHTML\s*=|document\.write\s*\(|dangerouslySetInnerHTML|\.html\(\s*[^=])"""
+        ),
+        "severity": Severity.MEDIUM,
+        "description": "Possible cross-site scripting via unsafe DOM / HTML rendering.",
+        "recommendation": "Sanitize user input and prefer textContent or safe templating.",
+        "cwe": "CWE-79",
+    },
+    {
+        "name": "Insecure deserialization",
+        "regex": re.compile(r"""(?i)(pickle\.loads|yaml\.load\s*\(|marshal\.loads|unserialize\s*\()"""),
+        "severity": Severity.HIGH,
+        "description": "Insecure deserialization can lead to remote code execution.",
+        "recommendation": "Avoid deserializing untrusted data. Use safe formats (JSON) with validation.",
+        "cwe": "CWE-502",
     },
 ]
 
@@ -58,7 +81,6 @@ class CodeScanner(BaseScanner):
         files = []
         for ext in SUPPORTED_EXTENSIONS:
             files.extend(self.path.rglob(f"*{ext}"))
-        # Limit for first versions to keep scans reasonable
         return files[:40]
 
     def _pattern_scan(self, content: str, file_path: Path) -> List[Finding]:
@@ -79,35 +101,17 @@ class CodeScanner(BaseScanner):
         return findings
 
     def _ai_scan(self, content: str, file_path: Path) -> List[Finding]:
-        """Send code to local LLM and try to extract findings."""
         if not self.ai.is_available():
             return []
 
-        # Limit size so we don't blow the context
         snippet = content[:6000]
         language = file_path.suffix.lstrip(".") or "unknown"
 
         try:
             raw = self.ai.analyze_code(snippet, language=language)
+            return self.ai.parse_findings(raw, str(file_path))
         except Exception:
             return []
-
-        findings = []
-        # Very lightweight parsing of AI response
-        lower = raw.lower()
-        if any(w in lower for w in ["vulnerability", "vulnerable", "injection", "xss", "secret", "insecure"]):
-            # Create one summary finding from AI for now
-            findings.append(
-                Finding(
-                    title="AI-detected potential security issue",
-                    severity=Severity.MEDIUM,
-                    description=raw[:800].strip(),
-                    location=str(file_path),
-                    recommendation="Review the AI analysis carefully and validate the issue manually.",
-                    confidence=0.55,
-                )
-            )
-        return findings
 
     def scan(self) -> List[Finding]:
         findings: List[Finding] = []
@@ -125,18 +129,15 @@ class CodeScanner(BaseScanner):
             if not content.strip():
                 continue
 
-            # Fast pattern-based detection (always runs)
             findings.extend(self._pattern_scan(content, file_path))
 
-            # Optional AI deep analysis (only if enabled and available)
             if self.use_ai:
                 findings.extend(self._ai_scan(content, file_path))
 
-        # Deduplicate by title + location
         seen = set()
         unique = []
         for f in findings:
-            key = (f.title, f.location)
+            key = (f.title.lower(), f.location)
             if key not in seen:
                 seen.add(key)
                 unique.append(f)
