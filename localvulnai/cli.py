@@ -1,11 +1,10 @@
 from typing import Optional, List
 import typer
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.console import Console
 
 from localvulnai import __version__
+from localvulnai import ui
 from localvulnai.ai.ollama_client import OllamaClient
 from localvulnai.scanners.code_scanner import CodeScanner
 from localvulnai.scanners.web_scanner import WebScanner
@@ -26,25 +25,42 @@ app = typer.Typer(
     name="localvulnai",
     help="Local AI-powered vulnerability scanner",
     add_completion=False,
+    rich_markup_mode="rich",
 )
 console = Console()
+
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context):
+    if ctx.invoked_subcommand is None:
+        ui.print_banner()
+        console.print(
+            "  [bold]Commands:[/bold]  "
+            "[cyan]scan[/cyan]  ·  [cyan]check[/cyan]  ·  [cyan]baseline[/cyan]  ·  [cyan]version[/cyan]"
+        )
+        console.print(
+            "  [dim]Example:[/dim]  [white]python -m localvulnai scan --path ./src --no-ai[/white]"
+        )
+        console.print()
 
 
 @app.command()
 def version():
     """Show version."""
-    console.print(f"LocalVulnAI v{__version__}")
+    ui.print_banner()
+    console.print(f"  [bold cyan]LocalVulnAI[/bold cyan] [white]v{__version__}[/white]")
+    console.print()
 
 
 @app.command()
 def check():
     """Check if Ollama is available."""
+    ui.print_banner()
     client = OllamaClient()
     if client.is_available():
-        console.print("[green]OK Ollama is available[/green]")
-        console.print(f"  Model: {client.model}")
+        ui.print_success(f"Ollama is online  ·  model: [bold]{client.model}[/bold]")
     else:
-        console.print("[red]Ollama is not reachable[/red]")
+        ui.print_error("Ollama is not reachable — start it or use --no-ai")
         raise typer.Exit(1)
 
 
@@ -54,45 +70,53 @@ def baseline(
     output: str = typer.Option(".localvulnai-ignore", "--output", "-o", help="Baseline file"),
 ):
     """Write current findings as ignore baseline."""
-    findings = CodeScanner(path, use_ai=False).scan()
-    findings.extend(scan_requirements(path))
-    write_baseline(findings, output)
-    console.print(f"[green]Wrote {len(findings)} fingerprints to {output}[/green]")
+    ui.print_banner()
+    with console.status("[cyan]Building baseline…[/cyan]"):
+        findings = CodeScanner(path, use_ai=False).scan()
+        findings.extend(scan_requirements(path))
+        write_baseline(findings, output)
+    ui.print_success(f"Saved [bold]{len(findings)}[/bold] fingerprints → [cyan]{output}[/cyan]")
 
 
 @app.command()
 def scan(
-    path: Optional[str] = typer.Option(None, "--path", "-p", help="Local path (comma-separated for multi)"),
-    url: Optional[str] = typer.Option(None, "--url", "-u", help="URL (comma-separated for multi)"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Save report to file"),
+    path: Optional[str] = typer.Option(None, "--path", "-p", help="Local path (comma-separated)"),
+    url: Optional[str] = typer.Option(None, "--url", "-u", help="URL (comma-separated)"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Save report"),
     format: str = typer.Option("md", "--format", "-f", help="md|json|sarif|burp|html"),
     no_ai: bool = typer.Option(False, "--no-ai", help="Pattern-only"),
-    deep: bool = typer.Option(False, "--deep", help="Playwright deep web scan"),
-    config: Optional[str] = typer.Option(None, "--config", "-c", help=".localvulnai.yml path"),
-    git_diff: bool = typer.Option(False, "--git-diff", help="Only scan files changed vs HEAD~1"),
-    ignore_file: Optional[str] = typer.Option(None, "--ignore", help=".localvulnai-ignore path"),
-    webhook: Optional[str] = typer.Option(None, "--webhook", help="Discord/Slack webhook URL"),
-    lang: str = typer.Option("en", "--lang", help="Report language: en|bn"),
-    deps: bool = typer.Option(True, "--deps/--no-deps", help="Scan requirements.txt heuristics"),
+    deep: bool = typer.Option(False, "--deep", help="Playwright deep web"),
+    config: Optional[str] = typer.Option(None, "--config", "-c", help=".localvulnai.yml"),
+    git_diff: bool = typer.Option(False, "--git-diff", help="Only changed files vs HEAD~1"),
+    ignore_file: Optional[str] = typer.Option(None, "--ignore", help=".localvulnai-ignore"),
+    webhook: Optional[str] = typer.Option(None, "--webhook", help="Discord/Slack webhook"),
+    lang: str = typer.Option("en", "--lang", help="en|bn for HTML"),
+    deps: bool = typer.Option(True, "--deps/--no-deps", help="Scan requirements.txt"),
 ):
     """Scan code or websites for vulnerabilities."""
+    ui.print_banner()
     if not path and not url and not git_diff:
-        console.print("[red]Error:[/red] Provide --path, --url, or --git-diff")
+        ui.print_error("Provide --path, --url, or --git-diff")
         raise typer.Exit(1)
     if format not in ("md", "json", "sarif", "burp", "html"):
-        console.print("[red]Error:[/red] format must be md|json|sarif|burp|html")
+        ui.print_error("format must be md | json | sarif | burp | html")
         raise typer.Exit(1)
 
     findings: List[Finding] = []
     targets: List[str] = []
     scan_cfg = load_scan_config(config)
 
-    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console) as progress:
-        task = progress.add_task("Scanning...", total=None)
+    with Progress(
+        SpinnerColumn(style="cyan"),
+        TextColumn("[cyan]{task.description}"),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Starting…", total=None)
 
         if git_diff:
             files = changed_files(".")
-            progress.update(task, description=f"Git diff: {len(files)} files")
+            progress.update(task, description=f"Git diff · {len(files)} files")
             for fp in files:
                 findings.extend(CodeScanner(str(fp), use_ai=not no_ai, config=scan_cfg).scan())
             targets.append("git-diff")
@@ -100,20 +124,20 @@ def scan(
                 findings.extend(scan_requirements("."))
 
         if path:
-            paths = [x.strip() for x in path.split(",") if x.strip()]
-            for p in paths:
-                progress.update(task, description=f"Code: {p}")
+            for p in [x.strip() for x in path.split(",") if x.strip()]:
+                progress.update(task, description=f"Scanning code · {p}")
                 findings.extend(CodeScanner(p, use_ai=not no_ai, config=scan_cfg).scan())
                 if deps:
                     findings.extend(scan_requirements(p))
                 targets.append(p)
 
         if url:
-            urls = [x.strip() for x in url.split(",") if x.strip()]
-            for u in urls:
-                progress.update(task, description=f"Web: {u}")
+            for u in [x.strip() for x in url.split(",") if x.strip()]:
+                progress.update(task, description=f"Scanning web · {u}")
                 findings.extend(WebScanner(u, deep=deep).scan())
                 targets.append(u)
+
+        progress.update(task, description="Deduplicating…")
 
     seen = set()
     unique = []
@@ -131,30 +155,10 @@ def scan(
 
     target = ", ".join(targets)
     summary = summarize(findings)
-    c = summary["counts"]
 
-    console.print()
-    console.print(Panel(f"Scan completed for [cyan]{target}[/cyan]", title="LocalVulnAI"))
-    console.print(
-        f"Summary: {summary['total']} findings | risk {summary['risk_score']} ({summary['risk_level']}) | "
-        f"crit={c['critical']} high={c['high']} med={c['medium']} low={c['low']} info={c['info']}"
-        + (f" | ignored={ignored_n}" if ignored_n else "")
-    )
-    console.print()
-
-    if not findings:
-        console.print("[green]No issues found.[/green]")
-    else:
-        table = Table(title=f"Findings ({len(findings)})")
-        table.add_column("Severity", style="bold", width=10)
-        table.add_column("Title")
-        table.add_column("Location")
-        for f in findings:
-            color = {"critical": "red", "high": "red", "medium": "yellow", "low": "blue", "info": "dim"}.get(
-                f.severity.value, "white"
-            )
-            table.add_row(f"[{color}]{f.severity.value.upper()}[/{color}]", f.title, f.location)
-        console.print(table)
+    ui.print_summary(summary, ignored=ignored_n, target=target)
+    ui.print_findings_table(findings)
+    ui.print_finding_details(findings, limit=5)
 
     if format == "json":
         generate_json_report(findings, target, output)
@@ -167,12 +171,11 @@ def scan(
     else:
         generate_markdown_report(findings, target, output)
 
-    if output:
-        console.print(f"[green]Report saved:[/green] {output}")
-
     if webhook:
         ok = notify_webhook(webhook, findings, target)
-        console.print("[green]Webhook sent[/green]" if ok else "[yellow]Webhook failed[/yellow]")
+        ui.print_info("Webhook delivered" if ok else "[yellow]Webhook failed[/yellow]")
+
+    ui.print_footer(output)
 
 
 if __name__ == "__main__":
