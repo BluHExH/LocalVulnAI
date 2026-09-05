@@ -1,5 +1,5 @@
 """Pretty terminal UI helpers for LocalVulnAI."""
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
@@ -12,22 +12,20 @@ from localvulnai import __version__
 
 console = Console()
 
-BANNER = r"""
-[bold cyan]
-  _                     _  __     __    _         _    ___
- | |                   | | \ \   / /   | |       | |  |_ _|
- | |     ___   ___ __ _| |  \ \ / /   _| |_ __   | |   | |
- | |    / _ \ / __/ _` | |   \ V / | | | | '_ \  | |   | |
- | |___| (_) | (_| (_| | |    | || |_| | | | | | | |___| |
- |______\___/ \___\__,_|_|    |_| \__,_|_|_| |_| |_____|_|
-[/bold cyan]
-"""
+BANNER = (
+    "[bold bright_cyan]"
+    "\n  ╔══════════════════════════════════════════════════╗"
+    "\n  ║   L O C A L V U L N A I                          ║"
+    "\n  ║   AI-powered · local · authorized testing only   ║"
+    "\n  ╚══════════════════════════════════════════════════╝"
+    "\n[/bold bright_cyan]"
+)
 
 SEV_STYLE = {
     "critical": "bold white on dark_red",
-    "high": "bold red",
-    "medium": "bold yellow",
-    "low": "bold blue",
+    "high": "bold bright_red",
+    "medium": "bold bright_yellow",
+    "low": "bold bright_blue",
     "info": "dim cyan",
 }
 
@@ -39,12 +37,13 @@ SEV_ICON = {
     "info": "ℹ️ ",
 }
 
-RISK_STYLE = {
-    "critical": "bold red",
-    "high": "bold bright_red",
-    "medium": "bold yellow",
-    "low": "bold green",
-    "clean": "bold bright_green",
+BORDER = {
+    "critical": "dark_red",
+    "high": "red",
+    "medium": "yellow",
+    "low": "blue",
+    "info": "cyan",
+    "clean": "green",
 }
 
 
@@ -53,20 +52,21 @@ def print_banner():
     console.print(
         Align.center(
             Text.from_markup(
-                f"[dim]v{__version__}[/dim]  [cyan]•[/cyan]  "
-                "[dim]local AI vulnerability scanner[/dim]  [cyan]•[/cyan]  "
+                f"[bold white]v{__version__}[/bold white]  [bright_cyan]◆[/bright_cyan]  "
+                "[white]Local AI Vulnerability Scanner[/white]  [bright_cyan]◆[/bright_cyan]  "
                 "[dim]authorized use only[/dim]"
             )
         )
     )
+    console.print(Align.center(Text.from_markup("[dim]──────────────────────────────────────────────[/dim]")))
     console.print()
 
 
 def print_error(msg: str):
     console.print(
         Panel(
-            f"[bold red]{msg}[/bold red]",
-            title="[red]Error[/red]",
+            Text.from_markup(f"[bold red]{msg}[/bold red]"),
+            title="[bold red] ✕ ERROR [/bold red]",
             border_style="red",
             padding=(0, 2),
         )
@@ -76,7 +76,8 @@ def print_error(msg: str):
 def print_success(msg: str):
     console.print(
         Panel(
-            f"[bold green]{msg}[/bold green]",
+            Text.from_markup(f"[bold green]{msg}[/bold green]"),
+            title="[bold green] ✓ DONE [/bold green]",
             border_style="green",
             padding=(0, 2),
         )
@@ -84,85 +85,84 @@ def print_success(msg: str):
 
 
 def print_info(msg: str):
-    console.print(f"[cyan]›[/cyan] {msg}")
+    console.print(Text.from_markup(f"[bright_cyan] ›[/bright_cyan] {msg}"))
 
 
-def risk_bar(score: int, width: int = 24) -> Text:
+def risk_bar(score: int, width: int = 28) -> Text:
+    score = max(0, min(100, int(score)))
     filled = int((score / 100) * width)
     empty = width - filled
     if score >= 40:
-        color = "red"
+        color = "bright_red"
     elif score >= 20:
-        color = "yellow"
+        color = "bright_yellow"
     elif score >= 8:
-        color = "blue"
+        color = "bright_blue"
     else:
-        color = "green"
+        color = "bright_green"
     bar = Text()
-    bar.append("█" * filled, style=color)
-    bar.append("░" * empty, style="dim")
-    bar.append(f"  {score}/100", style=f"bold {color}")
+    bar.append("━" * filled, style=f"bold {color}")
+    bar.append("━" * empty, style="dim")
+    bar.append(f"  {score}", style=f"bold {color}")
     return bar
 
 
-def print_scan_header(target: str, mode: str = ""):
+def _stat_panel(label: str, value: str, style: str) -> Panel:
     body = Text()
-    body.append("🎯  Target  ", style="bold")
-    body.append(target, style="cyan")
-    if mode:
-        body.append("\n⚙️   Mode    ", style="bold")
-        body.append(mode, style="dim")
-    console.print(
-        Panel(
-            body,
-            title="[bold cyan]Scan[/bold cyan]",
-            border_style="cyan",
-            padding=(0, 2),
-        )
-    )
+    body.append(f"{value}\n", style=f"bold {style}")
+    body.append(label, style="dim")
+    return Panel(Align.center(body), border_style=style, width=16, padding=(0, 1))
 
 
-def print_summary(summary: dict, ignored: int = 0):
-    c = summary["counts"]
-    level = summary["risk_level"]
-    style = RISK_STYLE.get(level, "white")
+def print_summary(summary: Dict[str, Any], ignored: int = 0, target: str = ""):
+    c = summary.get("counts", {})
+    level = summary.get("risk_level", "clean")
+    score = summary.get("risk_score", 0)
+    total = summary.get("total", 0)
 
-    cards = []
-    for label, key, sty in [
-        ("CRITICAL", "critical", "red"),
-        ("HIGH", "high", "red"),
-        ("MEDIUM", "medium", "yellow"),
-        ("LOW", "low", "blue"),
-        ("INFO", "info", "cyan"),
-    ]:
-        n = c.get(key, 0)
-        cards.append(
+    console.print()
+    if target:
+        console.print(
             Panel(
-                Align.center(Text(str(n), style=f"bold {sty}")),
-                title=f"[{sty}]{label}[/{sty}]",
-                border_style=sty if n else "dim",
-                width=14,
-                padding=(0, 0),
+                Text.from_markup(f"[bold white]Target[/bold white]  [bright_cyan]{target}[/bright_cyan]"),
+                border_style="bright_cyan",
+                padding=(0, 2),
             )
         )
 
-    console.print()
-    console.print(Rule("[bold]Summary[/bold]", style="cyan"))
-    console.print()
-    console.print(Columns(cards, equal=True, expand=False))
-    console.print()
+    gauge = Text()
+    gauge.append("RISK  ", style="bold white")
+    gauge.append(risk_bar(score))
+    gauge.append(
+        f"  [{level.upper()}]",
+        style=SEV_STYLE.get(level, "white") if level != "clean" else "bold bright_green",
+    )
 
-    risk_line = Text()
-    risk_line.append("Risk level  ", style="bold")
-    risk_line.append(level.upper(), style=style)
-    console.print(risk_line)
-    console.print(Text("Risk score  ", style="bold"), risk_bar(summary["risk_score"]))
     console.print(
-        Text.from_markup(
-            f"[bold]Findings[/bold]    [white]{summary['total']}[/white]"
-            + (f"  [dim]({ignored} ignored)[/dim]" if ignored else "")
+        Panel(
+            Align.center(gauge),
+            title="[bold] Security Score [/bold]",
+            border_style=BORDER.get(level, "cyan"),
+            padding=(0, 1),
         )
     )
+
+    cards = Columns(
+        [
+            _stat_panel("TOTAL", str(total), "white"),
+            _stat_panel("CRITICAL", str(c.get("critical", 0)), "bright_red"),
+            _stat_panel("HIGH", str(c.get("high", 0)), "red"),
+            _stat_panel("MEDIUM", str(c.get("medium", 0)), "yellow"),
+            _stat_panel("LOW", str(c.get("low", 0)), "blue"),
+            _stat_panel("INFO", str(c.get("info", 0)), "cyan"),
+        ],
+        equal=True,
+        expand=True,
+    )
+    console.print(cards)
+
+    if ignored:
+        console.print(Align.center(Text.from_markup(f"[dim]({ignored} findings hidden by baseline)[/dim]")))
     console.print()
 
 
@@ -170,35 +170,38 @@ def print_findings_table(findings: List[Finding]):
     if not findings:
         console.print(
             Panel(
-                Align.center("[bold green]✓  No issues found — looking clean[/bold green]"),
+                Align.center(
+                    Text.from_markup("[bold bright_green]✓ No issues found — looking clean[/bold bright_green]")
+                ),
                 border_style="green",
                 padding=(1, 2),
             )
         )
+        console.print()
         return
 
     table = Table(
         title="[bold]Findings[/bold]",
-        show_header=True,
-        header_style="bold cyan",
-        border_style="dim",
-        row_styles=["none", "dim"],
+        title_style="bold bright_cyan",
+        border_style="bright_cyan",
+        header_style="bold white",
+        show_lines=True,
         expand=True,
+        pad_edge=True,
     )
-    table.add_column("", width=2)
+    table.add_column("", width=3, justify="center")
     table.add_column("Severity", width=12)
     table.add_column("Issue", ratio=2)
-    table.add_column("Location", ratio=2, style="dim")
+    table.add_column("Location", ratio=2, style="cyan")
 
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
     sorted_f = sorted(findings, key=lambda x: order.get(x.severity.value, 5))
 
     for f in sorted_f:
         sev = f.severity.value
-        icon = SEV_ICON.get(sev, "•")
         table.add_row(
-            icon,
-            Text(sev.upper(), style=SEV_STYLE.get(sev, "white")),
+            SEV_ICON.get(sev, "•"),
+            Text(f" {sev.upper()} ", style=SEV_STYLE.get(sev, "white")),
             f.title,
             f.location,
         )
@@ -207,10 +210,10 @@ def print_findings_table(findings: List[Finding]):
     console.print()
 
 
-def print_finding_details(findings: List[Finding], limit: int = 5):
+def print_finding_details(findings: List[Finding], limit: int = 6):
     if not findings:
         return
-    console.print(Rule("[bold]Details[/bold]", style="cyan"))
+    console.print(Rule("[bold bright_cyan]Issue details[/bold bright_cyan]", style="bright_cyan"))
     console.print()
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
     sorted_f = sorted(findings, key=lambda x: order.get(x.severity.value, 5))
@@ -220,46 +223,62 @@ def print_finding_details(findings: List[Finding], limit: int = 5):
         icon = SEV_ICON.get(sev, "•")
         header = Text()
         header.append(f"{icon} ")
-        header.append(f.title, style="bold")
+        header.append(f.title, style="bold white")
         header.append("  ")
         header.append(f" {sev.upper()} ", style=SEV_STYLE.get(sev, "white"))
 
-        lines = [header, Text()]
-        lines.append(Text.from_markup(f"[dim]📍[/dim]  [cyan]{f.location}[/cyan]"))
-        lines.append(Text())
-        lines.append(Text(f.description[:300] + ("…" if len(f.description) > 300 else "")))
+        body_parts = [header, Text("")]
+        body_parts.append(Text.from_markup(f"[dim]📍[/dim]  [bright_cyan]{f.location}[/bright_cyan]"))
+        body_parts.append(Text(""))
+        desc = f.description[:320] + ("…" if len(f.description) > 320 else "")
+        body_parts.append(Text(desc, style="white"))
         if f.recommendation:
-            lines.append(Text())
-            lines.append(Text.from_markup(f"[green]💡 Fix:[/green] {f.recommendation}"))
+            body_parts.append(Text(""))
+            body_parts.append(Text.from_markup(f"[bright_green]💡 Fix[/bright_green]  {f.recommendation}"))
         if f.cwe:
-            lines.append(Text.from_markup(f"[dim]CWE: {f.cwe}[/dim]"))
+            body_parts.append(Text.from_markup(f"[dim]{f.cwe}[/dim]"))
 
         console.print(
             Panel(
-                Group(*lines),
-                border_style="dim",
+                Group(*body_parts),
+                border_style=BORDER.get(sev, "dim"),
                 padding=(0, 1),
-                title=f"[dim]#{i}[/dim]",
+                title=f"[bold]#{i}[/bold]",
                 title_align="left",
             )
         )
+
     if len(findings) > limit:
-        console.print(f"[dim]  … and {len(findings) - limit} more (see report file)[/dim]")
+        console.print(
+            Align.center(
+                Text.from_markup(
+                    f"[dim]… and {len(findings) - limit} more — open the report file for full list[/dim]"
+                )
+            )
+        )
     console.print()
 
 
 def print_footer(output: Optional[str] = None):
     console.print(Rule(style="dim"))
-    tips = Text.from_markup(
-        "[dim]Tips:[/dim]  "
-        "[cyan]-o report.html -f html[/cyan]  ·  "
-        "[cyan]--git-diff[/cyan]  ·  "
-        "[cyan]baseline[/cyan]  ·  "
-        "[cyan]--deep[/cyan]"
+    console.print(
+        Align.center(
+            Text.from_markup(
+                "[dim]Next:[/dim]  "
+                "[bright_cyan]-o report.html -f html[/bright_cyan]  ·  "
+                "[bright_cyan]--git-diff[/bright_cyan]  ·  "
+                "[bright_cyan]baseline[/bright_cyan]  ·  "
+                "[bright_cyan]--deep[/bright_cyan]"
+            )
+        )
     )
-    console.print(Align.center(tips))
     if output:
         console.print(
-            Align.center(Text.from_markup(f"[green]✓ Report saved →[/green] [bold]{output}[/bold]"))
+            Align.center(
+                Text.from_markup(
+                    f"[bright_green]✓ Report saved[/bright_green]  →  [bold white]{output}[/bold white]"
+                )
+            )
         )
+    console.print(Align.center(Text.from_markup("[dim]github.com/BluHExH/LocalVulnAI[/dim]")))
     console.print()
