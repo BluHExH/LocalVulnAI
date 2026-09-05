@@ -12,24 +12,26 @@ Find common vulnerabilities, get clear explanations, and suggested fixes — all
 ## Features
 
 - **Local-first** — Runs completely on your machine with Ollama
-- **Code scanning** — Pattern rules + optional AI deep analysis
-- **Web scanning** — Basic live URL security header checks
-- **Clean reports** — Markdown output
+- **Code scanning** — Strong pattern rules + optional AI deep analysis
+- **Web scanning** — Security headers, cookies, info disclosure
+- **Reports** — Markdown + JSON
 - **CLI focused** — Fast and scriptable
 - **No cloud** — Your code never leaves your machine
 
-### Currently detects (Code)
+### Code detection
 - Hard-coded secrets / API keys
-- Potential SQL injection (string formatting)
-- Command injection patterns
+- SQL injection (string formatting)
+- Command injection
 - Dangerous `eval` / `exec`
-- AI-assisted findings (when Ollama is available)
+- Potential XSS patterns
+- Insecure deserialization
+- AI-assisted findings (structured parsing)
 
-### Currently detects (Web)
-- Missing Content-Security-Policy
-- Missing X-Frame-Options / clickjacking protection
-- Missing HSTS
-- Server header information disclosure
+### Web detection
+- Missing CSP, HSTS, X-Frame-Options
+- Missing X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+- Server / X-Powered-By disclosure
+- Cookies missing Secure / HttpOnly flags
 
 ---
 
@@ -37,7 +39,7 @@ Find common vulnerabilities, get clear explanations, and suggested fixes — all
 
 - Python 3.10+
 - [Ollama](https://ollama.com) (optional but recommended)
-- A local model (recommended: `llama3.2`, `mistral`, or `qwen2.5`)
+- Recommended models: `llama3.2`, `mistral`, `qwen2.5`
 
 ```bash
 ollama pull llama3.2
@@ -62,45 +64,46 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-# Check if Ollama is ready
+# Check Ollama
 python -m localvulnai check
 
-# Scan a local directory (pattern + AI)
+# Scan local code (pattern + AI)
 python -m localvulnai scan --path ./your-project
 
-# Faster pattern-only scan (no AI)
+# Fast pattern-only scan
 python -m localvulnai scan --path ./your-project --no-ai
 
-# Scan a live URL (authorized targets only)
+# Scan authorized URL
 python -m localvulnai scan --url https://example.com
 
-# Save full report
-python -m localvulnai scan --path ./examples/sample_vulnerable_code --output report.md
+# Save Markdown report
+python -m localvulnai scan --path ./examples/sample_vulnerable_code -o report.md
+
+# Save JSON report
+python -m localvulnai scan --path ./examples/sample_vulnerable_code -o report.json --format json
 ```
 
 ---
 
 ## Project Status
 
-**v0.1.0** — Working core:
-- CLI
-- Pattern-based code scanner
-- Optional AI analysis via Ollama
-- Basic web header scanner
-- Markdown reports
+**v0.2.0**
+- Working CLI
+- Pattern-based code scanner (multiple rules)
+- Structured AI analysis via Ollama
+- Improved web header + cookie checks
+- Markdown + JSON reports
 
-**Next planned:**
-- Better AI response parsing into structured findings
+**Later ideas**
+- Playwright deeper web checks
+- Burp-friendly export
 - More language-specific rules
-- Playwright-based deeper web checks
-- JSON report format
-- Burp-friendly export (later)
 
 ---
 
 ## Disclaimer
 
-This tool is intended for **educational purposes** and **authorized security testing** only.  
+This tool is for **educational purposes** and **authorized security testing** only.  
 The authors are not responsible for any misuse.
 
 ---
