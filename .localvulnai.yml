@@ -1,0 +1,17 @@
+# LocalVulnAI configuration
+extensions:
+  - .py
+  - .js
+  - .ts
+  - .jsx
+  - .tsx
+  - .php
+  - .html
+  - .java
+  - .go
+  - .rb
+  - .cs
+max_files: 40
+disabled_rules: []
+# ollama_model: llama3.2
+# ollama_host: http://localhost:11434
