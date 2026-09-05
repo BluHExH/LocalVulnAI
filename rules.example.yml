@@ -1,0 +1,12 @@
+rules:
+  - id: no-todo-security
+    pattern: "TODO.*(security|auth|password)"
+    severity: low
+    description: Security-related TODO left in code
+    recommendation: Resolve or track in an issue tracker
+  - id: disable-ssl-verify
+    pattern: "verify\\s*=\\s*False"
+    severity: high
+    description: TLS certificate verification disabled
+    recommendation: Never disable verify in production
+    cwe: CWE-295

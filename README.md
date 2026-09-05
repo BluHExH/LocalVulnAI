@@ -1,73 +1,46 @@
 # LocalVulnAI
 
-**Local AI-powered vulnerability scanner**
+**Local AI-powered vulnerability scanner** — patterns + optional Ollama, web checks, reports, CI, web UI.
 
-Scan code and websites offline with pattern rules + optional local LLM (Ollama).  
-Markdown / JSON / SARIF / Burp-friendly reports. Small web UI included.
+> Authorized testing only.
 
-> ⚠️ **Authorized testing only.**
+## Highlights (v0.5)
 
-## Features
-
-- Code patterns: secrets, SQLi, command injection, eval, XSS, deserialization, weak hash, debug mode, path traversal, open redirect, SSRF hints
-- Optional AI analysis (Ollama) with structured findings
-- Web: security headers, cookies, optional Playwright `--deep`
-- Reports: `md` | `json` | `sarif` | `burp`
-- Risk summary score
-- Config file `.localvulnai.yml`
-- GitHub Actions + SARIF upload example
-- FastAPI web UI
-- Docker + GitHub Codespaces
+- Code rules + known secret patterns (AWS/GitHub/Slack/Stripe…)
+- Custom `rules.yml` patterns
+- `--git-diff` (only changed files)
+- Baseline ignore (`.localvulnai-ignore` + `baseline` command)
+- Dependency heuristics (`requirements.txt`)
+- Reports: md | json | sarif | burp | **html**
+- Multi-target paths/URLs (comma-separated)
+- `--webhook` Discord/Slack
+- `--lang bn` for HTML report
+- Pre-commit example, scheduled Actions, Docker, Codespaces, FastAPI UI
 
 ## Install
 
 ```bash
-git clone https://github.com/BluHExH/LocalVulnAI.git
-cd LocalVulnAI
+git clone https://github.com/BluHExH/LocalVulnAI.git && cd LocalVulnAI
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-# optional:
-ollama pull llama3.2
-playwright install chromium
 ```
 
-## CLI
+## Usage
 
 ```bash
-python -m localvulnai check
 python -m localvulnai scan --path ./examples/sample_vulnerable_code --no-ai
-python -m localvulnai scan --path ./src -o report.sarif -f sarif
-python -m localvulnai scan --path ./src -o burp.json -f burp
+python -m localvulnai scan --path ./a,./b --no-ai
+python -m localvulnai scan --git-diff --no-ai
+python -m localvulnai baseline --path .
+python -m localvulnai scan --path . --no-ai --ignore .localvulnai-ignore
+python -m localvulnai scan --path . --no-ai -o report.html -f html --lang bn
 python -m localvulnai scan --url https://example.com --deep
-python -m localvulnai scan --path ./src -c .localvulnai.yml
+python -m localvulnai scan --path . --no-ai --webhook https://hooks.slack.com/...
+
+uvicorn localvulnai.web.app:app --port 8000
 ```
-
-## Web UI
-
-```bash
-pip install -r requirements.txt
-uvicorn localvulnai.web.app:app --host 127.0.0.1 --port 8000
-# open http://127.0.0.1:8000
-```
-
-## Cloud shell
 
 **Codespaces:** https://codespaces.new/BluHExH/LocalVulnAI
-
-## Docker
-
-```bash
-docker build -t localvulnai .
-docker run --rm localvulnai scan --path /app/examples/sample_vulnerable_code --no-ai
-```
-
-## Config (`.localvulnai.yml`)
-
-```yaml
-extensions: [.py, .js, .ts]
-max_files: 40
-disabled_rules: []   # e.g. [weak-hash, debug-true]
-```
 
 ## License
 

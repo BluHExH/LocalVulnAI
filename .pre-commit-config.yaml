@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: localvulnai
+        name: LocalVulnAI
+        entry: python -m localvulnai scan --path . --no-ai
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
