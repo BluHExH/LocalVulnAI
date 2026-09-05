@@ -83,6 +83,27 @@ python -m localvulnai scan --path ./examples/sample_vulnerable_code -o report.js
 
 ---
 
+## Run in the cloud (no local install)
+
+### GitHub Codespaces (recommended)
+
+1. Open this link (while logged into GitHub):
+
+**https://codespaces.new/BluHExH/LocalVulnAI**
+
+2. Wait for the environment to build (2–5 minutes first time).
+3. In the terminal inside Codespaces:
+
+```bash
+python -m localvulnai check
+python -m localvulnai scan --path ./examples/sample_vulnerable_code --no-ai
+python -m localvulnai scan --url "https://example.com" --deep
+```
+
+You get a full Linux shell + VS Code in the browser. Free tier available on GitHub.
+
+---
+
 ## Project Status
 
 **v0.3.0**
@@ -90,6 +111,7 @@ python -m localvulnai scan --path ./examples/sample_vulnerable_code -o report.js
 - Web header/cookie scanner
 - Playwright deep mode
 - Markdown + JSON reports
+- GitHub Codespaces support
 
 ---
 
