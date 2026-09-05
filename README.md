@@ -12,23 +12,34 @@ Find common vulnerabilities, get clear explanations, and suggested fixes — all
 ## Features
 
 - **Local-first** — Runs completely on your machine with Ollama
-- **Code scanning** — Analyze local source code (Python, JS, PHP, etc.)
-- **Web scanning** — Basic live URL analysis
-- **AI explanations** — Understand *why* something is vulnerable and how to fix it
-- **Clean reports** — Markdown + JSON output
+- **Code scanning** — Pattern rules + optional AI deep analysis
+- **Web scanning** — Basic live URL security header checks
+- **Clean reports** — Markdown output
 - **CLI focused** — Fast and scriptable
+- **No cloud** — Your code never leaves your machine
+
+### Currently detects (Code)
+- Hard-coded secrets / API keys
+- Potential SQL injection (string formatting)
+- Command injection patterns
+- Dangerous `eval` / `exec`
+- AI-assisted findings (when Ollama is available)
+
+### Currently detects (Web)
+- Missing Content-Security-Policy
+- Missing X-Frame-Options / clickjacking protection
+- Missing HSTS
+- Server header information disclosure
 
 ---
 
 ## Requirements
 
 - Python 3.10+
-- [Ollama](https://ollama.com) installed and running
-- A local model pulled (recommended: `llama3.2`, `mistral`, or `qwen2.5`)
+- [Ollama](https://ollama.com) (optional but recommended)
+- A local model (recommended: `llama3.2`, `mistral`, or `qwen2.5`)
 
 ```bash
-# Install Ollama (if not already installed)
-# Then pull a model:
 ollama pull llama3.2
 ```
 
@@ -41,7 +52,7 @@ git clone https://github.com/BluHExH/LocalVulnAI.git
 cd LocalVulnAI
 
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
 pip install -r requirements.txt
 ```
@@ -51,27 +62,39 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-# Scan a local directory
+# Check if Ollama is ready
+python -m localvulnai check
+
+# Scan a local directory (pattern + AI)
 python -m localvulnai scan --path ./your-project
+
+# Faster pattern-only scan (no AI)
+python -m localvulnai scan --path ./your-project --no-ai
 
 # Scan a live URL (authorized targets only)
 python -m localvulnai scan --url https://example.com
 
-# Generate report
-python -m localvulnai scan --path ./your-project --output report.md
+# Save full report
+python -m localvulnai scan --path ./examples/sample_vulnerable_code --output report.md
 ```
 
 ---
 
 ## Project Status
 
-**Phase 1 (Current)** — Core structure + basic CLI + Ollama integration skeleton
+**v0.1.0** — Working core:
+- CLI
+- Pattern-based code scanner
+- Optional AI analysis via Ollama
+- Basic web header scanner
+- Markdown reports
 
-Coming next:
-- Real code pattern detection + AI analysis
-- Improved web scanning with Playwright
-- Better reporting
-- More language support
+**Next planned:**
+- Better AI response parsing into structured findings
+- More language-specific rules
+- Playwright-based deeper web checks
+- JSON report format
+- Burp-friendly export (later)
 
 ---
 
