@@ -1,0 +1,25 @@
+name: LocalVulnAI Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Scan sample (pattern only)
+        run: python -m localvulnai scan --path ./examples/sample_vulnerable_code --no-ai -o findings.sarif -f sarif
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: findings.sarif
