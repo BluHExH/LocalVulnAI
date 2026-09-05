@@ -2,122 +2,72 @@
 
 **Local AI-powered vulnerability scanner**
 
-Scan your code and websites offline using local LLMs (Ollama).  
-Find common vulnerabilities, get clear explanations, and suggested fixes — all without sending any data to the cloud.
+Scan code and websites offline with pattern rules + optional local LLM (Ollama).  
+Markdown / JSON / SARIF / Burp-friendly reports. Small web UI included.
 
-> ⚠️ **For authorized testing only.** Only scan systems and code you own or have explicit permission to test.
-
----
+> ⚠️ **Authorized testing only.**
 
 ## Features
 
-- **Local-first** — Runs completely on your machine with Ollama
-- **Code scanning** — Strong pattern rules + optional AI deep analysis
-- **Web scanning** — Security headers, cookies, info disclosure
-- **Deep web mode** — Playwright checks (forms, mixed content, password over HTTP)
-- **Reports** — Markdown + JSON
-- **CLI focused** — Fast and scriptable
+- Code patterns: secrets, SQLi, command injection, eval, XSS, deserialization, weak hash, debug mode, path traversal, open redirect, SSRF hints
+- Optional AI analysis (Ollama) with structured findings
+- Web: security headers, cookies, optional Playwright `--deep`
+- Reports: `md` | `json` | `sarif` | `burp`
+- Risk summary score
+- Config file `.localvulnai.yml`
+- GitHub Actions + SARIF upload example
+- FastAPI web UI
+- Docker + GitHub Codespaces
 
-### Code detection
-- Hard-coded secrets / API keys
-- SQL injection (string formatting)
-- Command injection
-- Dangerous `eval` / `exec`
-- Potential XSS patterns
-- Insecure deserialization
-- AI-assisted findings (structured parsing)
-
-### Web detection
-- Missing CSP, HSTS, X-Frame-Options, X-Content-Type-Options
-- Referrer-Policy, Permissions-Policy
-- Server / X-Powered-By disclosure
-- Cookies missing Secure / HttpOnly
-- `--deep`: password over HTTP, CSRF heuristic, mixed content
-
----
-
-## Requirements
-
-- Python 3.10+
-- [Ollama](https://ollama.com) (optional but recommended)
-- For deep web scans: Playwright browsers
-
-```bash
-ollama pull llama3.2
-playwright install chromium   # only if you use --deep
-```
-
----
-
-## Installation
+## Install
 
 ```bash
 git clone https://github.com/BluHExH/LocalVulnAI.git
 cd LocalVulnAI
-
-python -m venv .venv
-source .venv/bin/activate
-
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+# optional:
+ollama pull llama3.2
+playwright install chromium
 ```
 
----
-
-## Usage
-
-```bash
-python -m localvulnai check
-
-# Code scan
-python -m localvulnai scan --path ./your-project
-python -m localvulnai scan --path ./your-project --no-ai
-
-# Web scan
-python -m localvulnai scan --url https://example.com
-python -m localvulnai scan --url https://example.com --deep
-
-# Reports
-python -m localvulnai scan --path ./examples/sample_vulnerable_code -o report.md
-python -m localvulnai scan --path ./examples/sample_vulnerable_code -o report.json --format json
-```
-
----
-
-## Run in the cloud (no local install)
-
-### GitHub Codespaces (recommended)
-
-1. Open this link (while logged into GitHub):
-
-**https://codespaces.new/BluHExH/LocalVulnAI**
-
-2. Wait for the environment to build (2–5 minutes first time).
-3. In the terminal inside Codespaces:
+## CLI
 
 ```bash
 python -m localvulnai check
 python -m localvulnai scan --path ./examples/sample_vulnerable_code --no-ai
-python -m localvulnai scan --url "https://example.com" --deep
+python -m localvulnai scan --path ./src -o report.sarif -f sarif
+python -m localvulnai scan --path ./src -o burp.json -f burp
+python -m localvulnai scan --url https://example.com --deep
+python -m localvulnai scan --path ./src -c .localvulnai.yml
 ```
 
-You get a full Linux shell + VS Code in the browser. Free tier available on GitHub.
+## Web UI
 
----
+```bash
+pip install -r requirements.txt
+uvicorn localvulnai.web.app:app --host 127.0.0.1 --port 8000
+# open http://127.0.0.1:8000
+```
 
-## Project Status
+## Cloud shell
 
-**v0.3.0**
-- Pattern + AI code scanner
-- Web header/cookie scanner
-- Playwright deep mode
-- Markdown + JSON reports
-- GitHub Codespaces support
+**Codespaces:** https://codespaces.new/BluHExH/LocalVulnAI
 
----
+## Docker
 
-## Disclaimer
+```bash
+docker build -t localvulnai .
+docker run --rm localvulnai scan --path /app/examples/sample_vulnerable_code --no-ai
+```
 
-Educational and **authorized** security testing only.
+## Config (`.localvulnai.yml`)
+
+```yaml
+extensions: [.py, .js, .ts]
+max_files: 40
+disabled_rules: []   # e.g. [weak-hash, debug-true]
+```
 
 ## License
 
