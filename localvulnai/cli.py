@@ -45,6 +45,7 @@ def scan(
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Save report to file"),
     format: str = typer.Option("md", "--format", "-f", help="Report format: md or json"),
     no_ai: bool = typer.Option(False, "--no-ai", help="Disable AI analysis (pattern-only, faster)"),
+    deep: bool = typer.Option(False, "--deep", help="Deeper web scan with Playwright (forms, mixed content)"),
 ):
     """Scan code or a website for common vulnerabilities."""
     if not path and not url:
@@ -73,7 +74,7 @@ def scan(
             scanner = CodeScanner(path, use_ai=use_ai)
             findings = scanner.scan()
         else:
-            scanner = WebScanner(url)
+            scanner = WebScanner(url, deep=deep)
             findings = scanner.scan()
 
     console.print()
@@ -119,7 +120,7 @@ def scan(
     if output:
         console.print(f"[green]Report saved to:[/green] {output}")
     else:
-        console.print("[dim]Tip: use --output report.md  or  --output report.json --format json[/dim]")
+        console.print("[dim]Tip: --output report.md | --output report.json --format json | --deep for web[/dim]")
 
 
 if __name__ == "__main__":
